@@ -97,33 +97,51 @@
     </section>
 
     <script>
-        const WEBHOOK_URL = 'https://n8n.srv1515192.hstgr.cloud/webhook/92848d29-5973-4be9-af1f-db6d6cbaa548'; 
+        const WEBHOOK_URL = 'https://n8n.srv1515192.hstgr.cloud/webhook/singup_skillboost';
+
         document.getElementById('registrationForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('submitBtn');
             const msg = document.getElementById('responseMsg');
-            btn.disabled = true; btn.innerText = "ENVOI EN COURS...";
+            btn.disabled = true;
+            btn.innerText = "ENVOI EN COURS...";
+
             const selectedSkills = Array.from(document.querySelectorAll('input[name="skills"]:checked')).map(el => el.value);
+
             const formData = {
-                email: document.getElementById('email').value,
-                nom_complet: document.getElementById('fullname').value,
-                prenom: document.getElementById('firstname').value,
-                telephone: document.getElementById('phone').value,
-                experience: document.getElementById('experience').value,
-                domaines: selectedSkills,
-                source: document.getElementById('source').value,
-                motivation: document.getElementById('motivation').value,
-                timestamp: new Date().toISOString()
+                Email: document.getElementById('email').value,
+                Nom: document.getElementById('fullname').value,
+                Prenom: document.getElementById('firstname').value,
+                Telephone: document.getElementById('phone').value,
+                Experience: document.getElementById('experience').value,
+                Domaines: selectedSkills.join(', '),
+                Source: document.getElementById('source').value,
+                Motivation: document.getElementById('motivation').value,
+                Timestamp: new Date().toISOString()
             };
+
             try {
-                const response = await fetch(WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData) });
+                const response = await fetch(WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
                 if (response.ok) {
-                    msg.innerText = "Inscription envoyée avec succès !"; msg.className = "text-center text-sm mt-4 text-green-600 font-bold bg-green-50 px-4 py-3 rounded-xl";
-                    document.getElementById('registrationForm').reset(); document.getElementById('motVal').innerText = "7";
-                } else { throw new Error(); }
+                    msg.innerText = "Inscription envoyée avec succès !";
+                    msg.className = "text-center text-sm mt-4 text-green-600 font-bold bg-green-50 px-4 py-3 rounded-xl";
+                    document.getElementById('registrationForm').reset();
+                    document.getElementById('motVal').innerText = "7";
+                } else {
+                    throw new Error();
+                }
             } catch (error) {
-                msg.innerText = "Erreur de transmission."; msg.className = "text-center text-sm mt-4 text-red-600 font-bold";
-            } finally { btn.disabled = false; btn.innerText = "DÉPOSER MA CANDIDATURE"; msg.classList.remove('hidden'); }
+                msg.innerText = "Erreur de transmission.";
+                msg.className = "text-center text-sm mt-4 text-red-600 font-bold";
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "DÉPOSER MA CANDIDATURE";
+                msg.classList.remove('hidden');
+            }
         });
     </script>
 </body>
