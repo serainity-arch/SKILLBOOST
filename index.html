@@ -91,6 +91,7 @@
                     <div><h3 class="text-xs font-extrabold text-blue-600 uppercase tracking-widest mb-6 italic">04. Origine</h3><select id="source" name="source" class="input-cube w-full rounded-xl px-4 py-3.5 appearance-none"><option value="Google">Moteur de recherche</option><option value="Social">Réseaux Sociaux</option><option value="Recommendation">Recommandation</option></select></div>
                     <div><h3 class="text-xs font-extrabold text-blue-600 uppercase tracking-widest mb-6 italic">05. Motivation</h3><div class="flex justify-between mb-4 italic"><label class="text-sm font-bold text-slate-700 uppercase">Intensité (1-10)</label><span id="motVal" class="text-blue-600 font-extrabold text-lg">7</span></div><input type="range" id="motivation" min="1" max="10" value="7" class="w-full" oninput="document.getElementById('motVal').innerText = this.value"></div>
                 </div>
+                <input type="text" id="website" name="website" style="display:none" tabindex="-1" autocomplete="off">
                 <div class="pt-6"><button type="submit" id="submitBtn" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-5 rounded-xl shadow-xl uppercase tracking-widest text-xs italic transition-all">Déposer ma candidature</button><p id="responseMsg" class="text-center text-sm mt-6 hidden font-bold"></p></div>
             </form>
         </div>
@@ -117,7 +118,8 @@
                 Domaines: selectedSkills.join(', '),
                 Source: document.getElementById('source').value,
                 Motivation: document.getElementById('motivation').value,
-                Timestamp: new Date().toISOString()
+                Timestamp: new Date().toISOString(),
+                website: document.getElementById('website').value
             };
 
             try {
