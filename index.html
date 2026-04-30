@@ -91,7 +91,13 @@
                 <!-- 02. CHOIX DE L'ATELIER -->
                 <div>
                     <h3 class="text-xs font-extrabold text-blue-600 uppercase tracking-widest mb-8 border-l-4 border-blue-600 pl-4 italic">02. Choix de l'atelier *</h3>
-                    <div class="space-y-4" id="atelierList">
+
+                    <!-- Indicateur de chargement -->
+                    <div id="loadingPlaces" class="text-center py-6 text-slate-400 text-sm font-medium">
+                        ⏳ Chargement des places disponibles...
+                    </div>
+
+                    <div class="space-y-4" id="atelierList" style="display:none">
 
                         <div class="atelier-card" data-id="ATL-01" data-nom="Comprendre n8n" data-date="15 mai 2026" data-heure="10h00" data-presentiel-max="5" data-presentiel-inscrits="0" data-distanciel-max="10" data-distanciel-inscrits="0" onclick="selectAtelier(this)">
                             <div class="flex justify-between items-start">
@@ -99,7 +105,7 @@
                                     <p class="font-extrabold text-slate-900 uppercase italic text-sm">Comprendre n8n</p>
                                     <p class="text-slate-500 text-xs mt-1">📅 15 mai 2026 — 10h00</p>
                                 </div>
-                                <div class="text-right space-y-1">
+                                <div class="text-right space-y-1" id="badges-ATL-01">
                                     <div><span class="badge-places badge-dispo">Présentiel : 5 places</span></div>
                                     <div><span class="badge-places badge-dispo">Distanciel : 10 places</span></div>
                                 </div>
@@ -112,7 +118,7 @@
                                     <p class="font-extrabold text-slate-900 uppercase italic text-sm">Développer un workflow</p>
                                     <p class="text-slate-500 text-xs mt-1">📅 22 mai 2026 — 10h00</p>
                                 </div>
-                                <div class="text-right space-y-1">
+                                <div class="text-right space-y-1" id="badges-ATL-02">
                                     <div><span class="badge-places badge-dispo">Présentiel : 5 places</span></div>
                                     <div><span class="badge-places badge-dispo">Distanciel : 10 places</span></div>
                                 </div>
@@ -125,13 +131,18 @@
                                     <p class="font-extrabold text-slate-900 uppercase italic text-sm">Automatiser un business</p>
                                     <p class="text-slate-500 text-xs mt-1">📅 5 juin 2026 — 10h00</p>
                                 </div>
-                                <div class="text-right space-y-1">
+                                <div class="text-right space-y-1" id="badges-ATL-03">
                                     <div><span class="badge-places badge-dispo">Présentiel : 5 places</span></div>
                                     <div><span class="badge-places badge-dispo">Distanciel : 10 places</span></div>
                                 </div>
                             </div>
                         </div>
 
+                    </div>
+
+                    <!-- Erreur chargement -->
+                    <div id="errorPlaces" style="display:none" class="text-center py-4 text-red-500 text-sm font-medium">
+                        ⚠️ Impossible de charger les places. Rechargez la page.
                     </div>
 
                     <!-- CHOIX FORMAT -->
@@ -172,10 +183,66 @@
     <script>
         const WEBHOOK_URL = 'https://n8n.srv1515192.hstgr.cloud/webhook-test/singup_skillboost';
         const WEBHOOK_ALERTE_URL = 'https://n8n.srv1515192.hstgr.cloud/webhook-test/alerte_places';
+        const WEBHOOK_PLACES_URL = 'https://n8n.srv1515192.hstgr.cloud/webhook-test/places_dispo';
 
         let selectedAtelier = null;
         let selectedFormat = null;
 
+        // ─── CHARGEMENT DYNAMIQUE DES PLACES ───────────────────────────────────────
+        async function chargerPlaces() {
+            try {
+                const response = await fetch(WEBHOOK_PLACES_URL);
+                if (!response.ok) throw new Error('Réponse non OK');
+                const ateliers = await response.json();
+
+                ateliers.forEach(atelier => {
+                    const card = document.querySelector(`.atelier-card[data-id="${atelier.atelier_id}"]`);
+                    if (!card) return;
+
+                    const placesP = atelier.presentiel.disponibles;
+                    const placesD = atelier.distanciel.disponibles;
+                    const toutComplet = atelier.presentiel.complet && atelier.distanciel.complet;
+
+                    // Mise à jour des data-* pour que selectAtelier() ait les vraies valeurs
+                    card.dataset.presentielMax = atelier.presentiel.places_total;
+                    card.dataset.presentielInscrits = atelier.presentiel.inscrits;
+                    card.dataset.distancielMax = atelier.distanciel.places_total;
+                    card.dataset.distancielInscrits = atelier.distanciel.inscrits;
+
+                    // Mise à jour des badges
+                    const badgesEl = document.getElementById(`badges-${atelier.atelier_id}`);
+                    if (badgesEl) {
+                        badgesEl.innerHTML = `
+                            <div><span class="badge-places ${atelier.presentiel.complet ? 'badge-complet' : 'badge-dispo'}">
+                                Présentiel : ${atelier.presentiel.complet ? 'COMPLET' : placesP + ' place(s)'}
+                            </span></div>
+                            <div><span class="badge-places ${atelier.distanciel.complet ? 'badge-complet' : 'badge-dispo'}">
+                                Distanciel : ${atelier.distanciel.complet ? 'COMPLET' : placesD + ' place(s)'}
+                            </span></div>
+                        `;
+                    }
+
+                    // Désactiver la card si tout est complet
+                    if (toutComplet) {
+                        card.classList.add('complet');
+                    } else {
+                        card.classList.remove('complet');
+                    }
+                });
+
+                document.getElementById('loadingPlaces').style.display = 'none';
+                document.getElementById('atelierList').style.display = 'block';
+
+            } catch (err) {
+                console.error('Erreur chargement places:', err);
+                document.getElementById('loadingPlaces').style.display = 'none';
+                document.getElementById('errorPlaces').style.display = 'block';
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', chargerPlaces);
+
+        // ─── SÉLECTION ATELIER ──────────────────────────────────────────────────────
         function selectAtelier(card) {
             if (card.classList.contains('complet')) return;
             document.querySelectorAll('.atelier-card').forEach(c => c.classList.remove('selected'));
@@ -201,6 +268,7 @@
             if (selectedAtelier.distancielMax - selectedAtelier.distancielInscrits <= 0) btnD.classList.add('disabled');
         }
 
+        // ─── SÉLECTION FORMAT ───────────────────────────────────────────────────────
         function selectFormat(format) {
             const placesP = selectedAtelier.presentielMax - selectedAtelier.presentielInscrits;
             const placesD = selectedAtelier.distancielMax - selectedAtelier.distancielInscrits;
@@ -221,6 +289,7 @@
             document.getElementById('formatError').classList.add('hidden');
         }
 
+        // ─── ALERTE COMPLET ─────────────────────────────────────────────────────────
         async function envoyerAlerte() {
             const email = document.getElementById('alerteEmail').value;
             const msgEl = document.getElementById('alerteMsg');
@@ -251,6 +320,7 @@
             }
         }
 
+        // ─── SOUMISSION ─────────────────────────────────────────────────────────────
         document.getElementById('registrationForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             if (!selectedAtelier) { alert('Veuillez sélectionner un atelier.'); return; }
@@ -285,12 +355,13 @@
                     msg.innerText = "Inscription envoyée avec succès !";
                     msg.className = "text-center text-sm mt-4 text-green-600 font-bold bg-green-50 px-4 py-3 rounded-xl";
                     document.getElementById('registrationForm').reset();
-                    document.getElementById('motVal').innerText = "7";
                     document.querySelectorAll('.atelier-card').forEach(c => c.classList.remove('selected'));
                     document.getElementById('formatSection').classList.add('hidden');
                     document.getElementById('alerteSection').style.display = 'none';
                     selectedAtelier = null;
                     selectedFormat = null;
+                    // Recharger les places après inscription
+                    chargerPlaces();
                 } else {
                     throw new Error();
                 }
