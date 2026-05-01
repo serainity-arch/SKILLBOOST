@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/annuler", "destination": "/annuler.html" }
+  ]
+}
