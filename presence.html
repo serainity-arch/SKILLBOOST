@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SkillBoost Academy | Gestion des présences</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Space Grotesk', sans-serif; background-color: #f8fafc; color: #0f172a; }
+        .card-shadow { box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.05); }
+        .btn-presence { border: 2px solid #e2e8f0; border-radius: 10px; padding: 7px 14px; cursor: pointer; transition: all 0.15s; font-weight: 700; font-size: 12px; background: #ffffff; color: #94a3b8; font-family: 'Space Grotesk', sans-serif; }
+        .btn-presence:hover { border-color: #94a3b8; color: #0f172a; }
+        .btn-present.active { border-color: #16a34a !important; background: #dcfce7 !important; color: #16a34a !important; }
+        .btn-absent.active  { border-color: #dc2626 !important; background: #fee2e2 !important; color: #dc2626 !important; }
+        .participant-row:hover { background: #f8fafc; }
+        .toast { position: fixed; top: 24px; right: 24px; z-index: 999; transform: translateX(140%); transition: transform 0.3s ease; max-width: 360px; }
+        .toast.show { transform: translateX(0); }
+    </style>
+</head>
+<body>
+
+    <nav class="bg-white border-b border-slate-100 py-4 px-6 sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto flex justify-between items-center">
+            <div class="text-xl font-extrabold tracking-tighter uppercase italic">SKILLBOOST<span class="text-blue-600">.ACADEMY</span></div>
+            <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest italic">Gestion des présences</div>
+        </div>
+    </nav>
+
+    <main class="max-w-6xl mx-auto px-6 py-12 pb-36">
+
+        <div class="mb-10">
+            <h1 class="text-4xl font-extrabold tracking-tight uppercase italic mb-2">Présences</h1>
+            <p class="text-slate-500 text-sm">Marquez les participants présents ou absents, puis confirmez pour envoyer les attestations.</p>
+        </div>
+
+        <!-- Loading -->
+        <div id="loading" class="text-center py-24">
+            <div class="inline-block w-8 h-8 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin mb-4"></div>
+            <p class="text-slate-400 text-sm font-medium">Chargement des participants...</p>
+        </div>
+
+        <!-- Erreur -->
+        <div id="error" class="hidden bg-red-50 border border-red-200 rounded-2xl p-8 text-center text-red-600 text-sm font-semibold">
+            Impossible de charger les participants. Vérifiez que les workflows n8n sont actifs.
+        </div>
+
+        <!-- Ateliers -->
+        <div id="ateliers" class="hidden space-y-8"></div>
+
+    </main>
+
+    <!-- Barre d'action fixe -->
+    <div id="actionBar" class="hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-6 py-4 z-50">
+        <div class="max-w-6xl mx-auto flex items-center justify-between gap-4 flex-wrap">
+            <div class="text-sm text-slate-500 font-medium">
+                <span class="font-extrabold text-green-600" id="countPresent">0</span> présent(s)
+                &nbsp;·&nbsp;
+                <span class="font-extrabold text-red-500" id="countAbsent">0</span> absent(s)
+                &nbsp;·&nbsp;
+                <span class="font-extrabold text-slate-400" id="countNon">0</span> non renseigné(s)
+            </div>
+            <button id="btnConfirm" onclick="confirmerPresences()"
+                class="bg-blue-600 text-white px-8 py-3 rounded-full text-sm font-extrabold hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 uppercase tracking-wide italic">
+                <span id="btnSpinner" class="hidden w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
+                <span id="btnText">Confirmer et envoyer les attestations</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast rounded-2xl px-5 py-4 text-sm font-semibold card-shadow"></div>
+
+    <script>
+        const WEBHOOK_LIRE = 'https://n8n.srv1515192.hstgr.cloud/webhook/presence_lire';
+        const WEBHOOK_MAJ  = 'https://n8n.srv1515192.hstgr.cloud/webhook/presence_maj';
+
+        const ATELIERS_META = {
+            'ATL-01': { nom: 'Comprendre n8n',           date: '15 mai 2026',  heure: '10h00' },
+            'ATL-02': { nom: 'Développer un workflow',    date: '22 mai 2026',  heure: '10h00' },
+            'ATL-03': { nom: 'Automatiser un business',   date: '5 juin 2026',  heure: '10h00' }
+        };
+
+        let data = {};
+        let presences = {};
+
+        async function init() {
+            try {
+                const res = await fetch(WEBHOOK_LIRE);
+                if (!res.ok) throw new Error();
+                data = await res.json();
+                render();
+            } catch(e) {
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('error').classList.remove('hidden');
+            }
+        }
+
+        function render() {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('ateliers').classList.remove('hidden');
+            document.getElementById('actionBar').classList.remove('hidden');
+
+            const container = document.getElementById('ateliers');
+
+            ['ATL-01', 'ATL-02', 'ATL-03'].forEach(id => {
+                const participants = data[id] || [];
+                const meta = ATELIERS_META[id];
+
+                participants.forEach(p => {
+                    presences[id + '_' + p.EMAIL] = p.STATUT_PRESENCE || '';
+                });
+
+                const block = document.createElement('div');
+                block.className = 'bg-white rounded-3xl border border-slate-200 card-shadow overflow-hidden';
+                block.id = 'block-' + id;
+
+                block.innerHTML = `
+                    <div class="px-8 py-5 border-b border-slate-100 flex items-start justify-between flex-wrap gap-4">
+                        <div>
+                            <p class="text-xs font-extrabold text-blue-600 uppercase tracking-widest italic mb-1 border-l-4 border-blue-600 pl-3">${id}</p>
+                            <p class="text-xl font-extrabold uppercase italic tracking-tight">${meta.nom}</p>
+                            <p class="text-xs text-slate-400 font-medium mt-1">📅 ${meta.date} &nbsp;·&nbsp; ${meta.heure}</p>
+                        </div>
+                        <div class="flex gap-2 flex-wrap mt-1" id="stats-${id}">
+                            <span class="text-xs font-bold px-3 py-1.5 rounded-full bg-slate-100 text-slate-500" id="stat-total-${id}">— inscrits</span>
+                            <span class="text-xs font-bold px-3 py-1.5 rounded-full bg-green-50 text-green-600 border border-green-200" id="stat-present-${id}">0 présents</span>
+                            <span class="text-xs font-bold px-3 py-1.5 rounded-full bg-red-50 text-red-500 border border-red-200" id="stat-absent-${id}">0 absents</span>
+                        </div>
+                    </div>
+                    ${participants.length === 0
+                        ? `<div class="py-12 text-center text-slate-400 text-sm font-medium">Aucun participant inscrit pour cet atelier.</div>`
+                        : `<div>
+                            <div class="grid grid-cols-5 gap-4 px-8 py-3 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest border-b border-slate-100 bg-slate-50">
+                                <span>Prénom</span><span>Nom</span><span>Email</span><span>Format</span><span>Présence</span>
+                            </div>
+                            <div id="table-${id}"></div>
+                           </div>`
+                    }
+                `;
+                container.appendChild(block);
+
+                if (participants.length > 0) {
+                    const table = document.getElementById('table-' + id);
+                    participants.forEach(p => {
+                        const key = id + '_' + p.EMAIL;
+                        const isPresentiel = (p.FORMAT || '').toLowerCase().includes('présentiel');
+                        const formatBadge = isPresentiel
+                            ? 'bg-blue-50 text-blue-600 border border-blue-200'
+                            : 'bg-cyan-50 text-cyan-600 border border-cyan-200';
+
+                        const row = document.createElement('div');
+                        row.className = 'participant-row grid grid-cols-5 gap-4 px-8 py-4 border-b border-slate-100 items-center last:border-b-0 transition-colors';
+                        row.innerHTML = `
+                            <span class="text-sm font-semibold">${p.PRENOM || '—'}</span>
+                            <span class="text-sm font-semibold">${p.NOM || '—'}</span>
+                            <span class="text-xs text-slate-500 truncate">${p.EMAIL || '—'}</span>
+                            <span class="text-[11px] font-bold px-2 py-1 rounded-lg ${formatBadge} inline-block w-fit">${p.FORMAT || '—'}</span>
+                            <div class="flex gap-2">
+                                <button class="btn-presence btn-present" id="btn-p-${key}" onclick="setPresence('${key}','${id}','Présent')">✓ Présent</button>
+                                <button class="btn-presence btn-absent"  id="btn-a-${key}" onclick="setPresence('${key}','${id}','Absent')">✗ Absent</button>
+                            </div>
+                        `;
+                        table.appendChild(row);
+
+                        if (p.STATUT_PRESENCE === 'Présent') document.getElementById('btn-p-' + key)?.classList.add('active');
+                        if (p.STATUT_PRESENCE === 'Absent')  document.getElementById('btn-a-' + key)?.classList.add('active');
+                    });
+                }
+
+                updateStats(id);
+            });
+
+            updateGlobalCount();
+        }
+
+        function setPresence(key, atelierId, statut) {
+            presences[key] = statut;
+            const btnP = document.getElementById('btn-p-' + key);
+            const btnA = document.getElementById('btn-a-' + key);
+            btnP?.classList.remove('active');
+            btnA?.classList.remove('active');
+            if (statut === 'Présent') btnP?.classList.add('active');
+            if (statut === 'Absent')  btnA?.classList.add('active');
+            updateStats(atelierId);
+            updateGlobalCount();
+        }
+
+        function updateStats(id) {
+            const participants = data[id] || [];
+            let present = 0, absent = 0;
+            participants.forEach(p => {
+                const v = presences[id + '_' + p.EMAIL];
+                if (v === 'Présent') present++;
+                else if (v === 'Absent') absent++;
+            });
+            document.getElementById('stat-total-' + id).textContent   = participants.length + ' inscrits';
+            document.getElementById('stat-present-' + id).textContent = present + ' présents';
+            document.getElementById('stat-absent-' + id).textContent  = absent + ' absents';
+        }
+
+        function updateGlobalCount() {
+            let present = 0, absent = 0, non = 0;
+            Object.values(presences).forEach(v => {
+                if (v === 'Présent') present++;
+                else if (v === 'Absent') absent++;
+                else non++;
+            });
+            document.getElementById('countPresent').textContent = present;
+            document.getElementById('countAbsent').textContent  = absent;
+            document.getElementById('countNon').textContent     = non;
+        }
+
+        async function confirmerPresences() {
+            const btn     = document.getElementById('btnConfirm');
+            const spinner = document.getElementById('btnSpinner');
+            const text    = document.getElementById('btnText');
+            btn.disabled  = true;
+            spinner.classList.remove('hidden');
+            text.textContent = 'Envoi en cours...';
+
+            const participants = [];
+            ['ATL-01', 'ATL-02', 'ATL-03'].forEach(id => {
+                const meta = ATELIERS_META[id];
+                (data[id] || []).forEach(p => {
+                    participants.push({
+                        email: p.EMAIL,
+                        prenom: p.PRENOM,
+                        nom: p.NOM,
+                        atelier_id: id,
+                        atelier_nom: meta.nom,
+                        atelier_date: meta.date,
+                        atelier_heure: meta.heure,
+                        format: p.FORMAT,
+                        statut_presence: presences[id + '_' + p.EMAIL] || ''
+                    });
+                });
+            });
+
+            try {
+                const res = await fetch(WEBHOOK_MAJ, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ participants })
+                });
+                if (!res.ok) throw new Error();
+                showToast('✅ Présences enregistrées. Attestations envoyées aux présents.', 'bg-green-50 border border-green-200 text-green-700');
+            } catch(e) {
+                showToast("❌ Erreur lors de l'envoi. Réessayez.", 'bg-red-50 border border-red-200 text-red-600');
+            } finally {
+                btn.disabled = false;
+                spinner.classList.add('hidden');
+                text.textContent = 'Confirmer et envoyer les attestations';
+            }
+        }
+
+        function showToast(msg, classes) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = 'toast rounded-2xl px-5 py-4 text-sm font-semibold card-shadow ' + classes;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 5000);
+        }
+
+        init();
+    </script>
+</body>
+</html>
