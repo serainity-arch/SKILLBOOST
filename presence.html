@@ -88,7 +88,12 @@
             try {
                 const res = await fetch(WEBHOOK_LIRE);
                 if (!res.ok) throw new Error();
-                data = await res.json();
+                const raw = await res.json();
+                data = {
+                    'ATL-01': Array.isArray(raw['ATL-01']) ? raw['ATL-01'] : [],
+                    'ATL-02': Array.isArray(raw['ATL-02']) ? raw['ATL-02'] : [],
+                    'ATL-03': Array.isArray(raw['ATL-03']) ? raw['ATL-03'] : []
+                };
                 render();
             } catch(e) {
                 document.getElementById('loading').classList.add('hidden');
