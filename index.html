@@ -319,6 +319,9 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         Email: email,
+                        Nom: document.getElementById('fullname').value,
+                        Prenom: document.getElementById('firstname').value,
+                        Telephone: document.getElementById('phone').value,
                         Atelier_ID: selectedAtelier.id,
                         Atelier: selectedAtelier.nom,
                         Atelier_Date: selectedAtelier.date,
