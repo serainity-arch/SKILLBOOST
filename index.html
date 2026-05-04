@@ -155,14 +155,24 @@
                         <p id="formatError" class="text-red-500 text-xs mt-2 hidden">Veuillez sélectionner un format.</p>
                     </div>
 
-                    <!-- ALERTE COMPLET -->
-                    <div id="alerteSection" style="display:none" class="mt-6 bg-amber-50 border border-amber-200 rounded-xl p-5">
-                        <p class="text-sm font-bold text-amber-800 mb-3">⚠️ Ce format est complet. Souhaitez-vous être alerté si une place se libère ?</p>
+                    <!-- ALERTE COMPLET PRESENTIEL -->
+                    <div id="alerteSectionPresentiel" style="display:none" class="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-5">
+                        <p class="text-sm font-bold text-amber-800 mb-3">🏢 Présentiel complet — Être notifié si une place se libère ?</p>
                         <div class="flex gap-3">
-                            <input type="email" id="alerteEmail" class="input-cube flex-1 rounded-xl px-4 py-3 text-sm" placeholder="votre@email.com">
-                            <button type="button" onclick="envoyerAlerte()" class="bg-amber-500 hover:bg-amber-600 text-white font-bold px-5 py-3 rounded-xl text-sm transition-all">M'alerter</button>
+                            <input type="email" id="alerteEmailPresentiel" class="input-cube flex-1 rounded-xl px-4 py-3 text-sm" placeholder="votre@email.com">
+                            <button type="button" onclick="envoyerAlerte('Présentiel')" class="bg-amber-500 hover:bg-amber-600 text-white font-bold px-5 py-3 rounded-xl text-sm transition-all">M'alerter</button>
                         </div>
-                        <p id="alerteMsg" class="text-xs mt-2 hidden"></p>
+                        <p id="alerteMsgPresentiel" class="text-xs mt-2 hidden"></p>
+                    </div>
+
+                    <!-- ALERTE COMPLET DISTANCIEL -->
+                    <div id="alerteSectionDistanciel" style="display:none" class="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-5">
+                        <p class="text-sm font-bold text-amber-800 mb-3">💻 Distanciel complet — Être notifié si une place se libère ?</p>
+                        <div class="flex gap-3">
+                            <input type="email" id="alerteEmailDistanciel" class="input-cube flex-1 rounded-xl px-4 py-3 text-sm" placeholder="votre@email.com">
+                            <button type="button" onclick="envoyerAlerte('Distanciel')" class="bg-amber-500 hover:bg-amber-600 text-white font-bold px-5 py-3 rounded-xl text-sm transition-all">M'alerter</button>
+                        </div>
+                        <p id="alerteMsgDistanciel" class="text-xs mt-2 hidden"></p>
                     </div>
 
                 </div>
@@ -182,7 +192,7 @@
 
     <script>
         const WEBHOOK_URL = 'https://n8n.srv1515192.hstgr.cloud/webhook/singup_skillboost';
-        const WEBHOOK_ALERTE_URL = 'https://n8n.srv1515192.hstgr.cloud/webhook-test/alerte_places';
+        const WEBHOOK_ALERTE_URL = 'https://n8n.srv1515192.hstgr.cloud/webhook/alerte_places';
         const WEBHOOK_PLACES_URL = 'https://n8n.srv1515192.hstgr.cloud/webhook/places_dispo';
 
         let selectedAtelier = null;
@@ -259,28 +269,30 @@
             };
             selectedFormat = null;
             document.getElementById('formatSection').classList.remove('hidden');
-            document.getElementById('alerteSection').style.display = 'none';
+            document.getElementById('alerteSectionPresentiel').style.display = 'none';
+            document.getElementById('alerteSectionDistanciel').style.display = 'none';
             const btnP = document.getElementById('btnPresentiel');
             const btnD = document.getElementById('btnDistanciel');
             btnP.classList.remove('selected', 'disabled');
             btnD.classList.remove('selected', 'disabled');
-            if (selectedAtelier.presentielMax - selectedAtelier.presentielInscrits <= 0) btnP.classList.add('disabled');
-            if (selectedAtelier.distancielMax - selectedAtelier.distancielInscrits <= 0) btnD.classList.add('disabled');
+            const placesP = selectedAtelier.presentielMax - selectedAtelier.presentielInscrits;
+            const placesD = selectedAtelier.distancielMax - selectedAtelier.distancielInscrits;
+            if (placesP <= 0) {
+                btnP.classList.add('disabled');
+                document.getElementById('alerteSectionPresentiel').style.display = 'block';
+            }
+            if (placesD <= 0) {
+                btnD.classList.add('disabled');
+                document.getElementById('alerteSectionDistanciel').style.display = 'block';
+            }
         }
 
         // ─── SÉLECTION FORMAT ───────────────────────────────────────────────────────
         function selectFormat(format) {
             const placesP = selectedAtelier.presentielMax - selectedAtelier.presentielInscrits;
             const placesD = selectedAtelier.distancielMax - selectedAtelier.distancielInscrits;
-            if (format === 'Présentiel' && placesP <= 0) {
-                document.getElementById('alerteSection').style.display = 'block';
-                return;
-            }
-            if (format === 'Distanciel' && placesD <= 0) {
-                document.getElementById('alerteSection').style.display = 'block';
-                return;
-            }
-            document.getElementById('alerteSection').style.display = 'none';
+            if (format === 'Présentiel' && placesP <= 0) return;
+            if (format === 'Distanciel' && placesD <= 0) return;
             selectedFormat = format;
             document.getElementById('btnPresentiel').classList.remove('selected');
             document.getElementById('btnDistanciel').classList.remove('selected');
@@ -290,9 +302,11 @@
         }
 
         // ─── ALERTE COMPLET ─────────────────────────────────────────────────────────
-        async function envoyerAlerte() {
-            const email = document.getElementById('alerteEmail').value;
-            const msgEl = document.getElementById('alerteMsg');
+        async function envoyerAlerte(format) {
+            const inputId = format === 'Présentiel' ? 'alerteEmailPresentiel' : 'alerteEmailDistanciel';
+            const msgId   = format === 'Présentiel' ? 'alerteMsgPresentiel'   : 'alerteMsgDistanciel';
+            const email   = document.getElementById(inputId).value;
+            const msgEl   = document.getElementById(msgId);
             if (!email) {
                 msgEl.innerText = 'Veuillez saisir votre email.';
                 msgEl.className = 'text-xs mt-2 text-red-600';
@@ -307,10 +321,12 @@
                         Email: email,
                         Atelier_ID: selectedAtelier.id,
                         Atelier: selectedAtelier.nom,
-                        Format: selectedFormat || 'Non précisé'
+                        Atelier_Date: selectedAtelier.date,
+                        Atelier_Heure: selectedAtelier.heure,
+                        Format: format
                     })
                 });
-                msgEl.innerText = "✅ Vous serez alerté dès qu'une place se libère.";
+                msgEl.innerText = "✅ Vous serez notifié dès qu'une place se libère.";
                 msgEl.className = 'text-xs mt-2 text-green-600 font-bold';
                 msgEl.classList.remove('hidden');
             } catch {
@@ -357,7 +373,8 @@
                     document.getElementById('registrationForm').reset();
                     document.querySelectorAll('.atelier-card').forEach(c => c.classList.remove('selected'));
                     document.getElementById('formatSection').classList.add('hidden');
-                    document.getElementById('alerteSection').style.display = 'none';
+                    document.getElementById('alerteSectionPresentiel').style.display = 'none';
+                    document.getElementById('alerteSectionDistanciel').style.display = 'none';
                     selectedAtelier = null;
                     selectedFormat = null;
                     // Recharger les places après inscription
