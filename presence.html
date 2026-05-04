@@ -109,7 +109,7 @@
             const container = document.getElementById('ateliers');
 
             ['ATL-01', 'ATL-02', 'ATL-03'].forEach(id => {
-                const participants = data[id] || [];
+                const participants = (data[id] || []).filter(p => p.EMAIL);
                 const meta = ATELIERS_META[id];
 
                 participants.forEach(p => {
